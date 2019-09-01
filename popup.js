@@ -4,14 +4,15 @@ const jwtList = document.getElementById("jwtList");
 console = chrome.extension.getBackgroundPage().console;
 
 const decodeJWT = (jwtString) => {
-  const splittedJwt = jwtString.split(".");
-  if(splittedJwt.length !== 3){
+  const splitJwt = jwtString.split(".");
+  if(splitJwt.length !== 3){
     return null
   }
-  const payload = splittedJwt[1];
+  const [header, payload] = splitJwt;
   try {
+    const decodedHeader = window.atob(header.replace("-","+").replace("_","/"));
     const decodedPayload = window.atob(payload.replace("-","+").replace("_","/"));
-    return decodedPayload;
+    return [JSON.parse(decodedHeader), JSON.parse(decodedPayload)];
   } catch (err){
     return null;
   }
@@ -24,14 +25,17 @@ button.onclick = () => {
     console.log("tab url", url);
     const domain = url.replace(/^(?:https?:\/\/)?(?:www\.)?/gi,".").split("/")[0];
     console.log("domain", domain)
-    chrome.cookies.getAll({domain},function (cookies){
-      console.log("here are the cookies", cookies)
-      const gstCookie = cookies.filter((cookie)=> cookie.name === "gst")[0];
-      const jwt = gstCookie.value
-      console.log("before decoding", jwt);
-      const jwtDecoded = decodeJWT(jwt);
-      console.log("decoded",jwtDecoded);
-      let jwtTextNode = document.createTextNode(jwtDecoded);
+    chrome.cookies.getAll({domain},(cookies) => {
+      const jwtPayloads = cookies.reduce((acc, cookie)=> {
+        const decodedCookie = decodeJWT(cookie.value);
+        if(decodedCookie && decodedCookie[0].typ && decodedCookie[0].typ.toLowerCase() === "jwt"){
+          return [...acc, decodedCookie[1]];
+        } else {
+          return acc;
+        }
+      },[]);
+      console.log(jwtPayloads);
+      let jwtTextNode = document.createTextNode(JSON.stringify(jwtPayloads[0]));
       jwtList.appendChild(jwtTextNode);
     });
   })
