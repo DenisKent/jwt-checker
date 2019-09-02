@@ -5,14 +5,15 @@ const searchForJwts = () => {
   chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
     const url = tabs[0].url;
     const domain = url.replace(/^(?:https?:\/\/)?(?:www\.)?/gi,".").split("/")[0];
-    chrome.cookies.getAll({domain},(cookies) => {
+    chrome.cookies.getAll({},(cookies) => {
       const jwtPayloads = cookies.reduce((acc, cookie)=> {
-        const decodedCookie = decodeJWT(cookie.value);
-        if(decodedCookie && decodedCookie[0].typ && decodedCookie[0].typ.toLowerCase() === "jwt"){
-          return [...acc, decodedCookie[1]];
-        } else {
-          return acc;
-        }
+        if(!url.includes(cookie.domain)) return acc;
+          const decodedCookie = decodeJWT(cookie.value);
+          if(decodedCookie && decodedCookie[0].typ && decodedCookie[0].typ.toLowerCase() === "jwt"){
+            return [...acc, decodedCookie[1]];
+          } else {
+            return acc;
+          }
       },[]);
       if(jwtPayloads.length) chrome.browserAction.setIcon({path:"extension-active.png"});
       chrome.storage.local.set({jwts: jwtPayloads}, () => {
