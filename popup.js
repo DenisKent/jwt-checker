@@ -3,40 +3,38 @@ const jwtList = document.getElementById("jwtList");
 
 console = chrome.extension.getBackgroundPage().console;
 
-const decodeJWT = (jwtString) => {
-  const splitJwt = jwtString.split(".");
-  if(splitJwt.length !== 3){
-    return null
-  }
-  const [header, payload] = splitJwt;
-  try {
-    const decodedHeader = window.atob(header.replace("-","+").replace("_","/"));
-    const decodedPayload = window.atob(payload.replace("-","+").replace("_","/"));
-    return [JSON.parse(decodedHeader), JSON.parse(decodedPayload)];
-  } catch (err){
-    return null;
-  }
+chrome.storage.onChanged.addListener(() => {
+  let jwtTextNode = document.createTextNode(JSON.stringify("here2"));
+  jwtList.appendChild(jwtTextNode);
+  console.log("storage changed")
+  chrome.storage.local.get(['jwts'], (result) => {
+    console.log('Value currently is ' + result);
+  });
+})
+
+const formatObjectForDisplay = (obj) => {
+  const div = document.createElement("div");
+  const start = document.createElement("p");
+  start.textContent = "{"
+  div.appendChild(start);
+  Object.keys(obj).forEach((key)=> {
+    const keyValue = document.createElement("p");
+    keyValue.textContent = `"${key}" : ${obj[key]}`;
+    div.appendChild(keyValue);
+  })
+  const end = document.createElement("p");
+  end.textContent = "}"
+  div.appendChild(end);
+  return div;
 }
 
-button.onclick = () => {
-  console.log("running on click")
-  chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
-    const url = tabs[0].url;
-    console.log("tab url", url);
-    const domain = url.replace(/^(?:https?:\/\/)?(?:www\.)?/gi,".").split("/")[0];
-    console.log("domain", domain)
-    chrome.cookies.getAll({domain},(cookies) => {
-      const jwtPayloads = cookies.reduce((acc, cookie)=> {
-        const decodedCookie = decodeJWT(cookie.value);
-        if(decodedCookie && decodedCookie[0].typ && decodedCookie[0].typ.toLowerCase() === "jwt"){
-          return [...acc, decodedCookie[1]];
-        } else {
-          return acc;
-        }
-      },[]);
-      console.log(jwtPayloads);
-      let jwtTextNode = document.createTextNode(JSON.stringify(jwtPayloads[0]));
-      jwtList.appendChild(jwtTextNode);
-    });
+chrome.storage.local.get(['jwts'], ({jwts}) => {
+  if(!jwts.length) {
+    const userMessage = document.createTextNode("No JWTs found");
+    jwtList.appendChild(userMessage);
+  }
+  jwts.forEach((jwt)=> {
+    const div = formatObjectForDisplay(jwt)
+    jwtList.appendChild(div);
   })
-};
+});
